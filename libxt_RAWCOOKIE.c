@@ -107,6 +107,7 @@ static void RAWCOOKIE_save(const void *ip, const struct xt_entry_target *target)
 		printf(" --ecn");
 }
 
+/*
 static int RAWCOOKIE_xlate(struct xt_xlate *xl,
 		          const struct xt_xlate_tg_params *params)
 {
@@ -128,6 +129,7 @@ static int RAWCOOKIE_xlate(struct xt_xlate *xl,
 
 	return 1;
 }
+*/
 
 static struct xtables_target rawcookie_tg_reg = {
 	.family        = NFPROTO_UNSPEC,
@@ -142,7 +144,7 @@ static struct xtables_target rawcookie_tg_reg = {
 	.x6_parse      = RAWCOOKIE_parse,
 	.x6_fcheck     = RAWCOOKIE_check,
 	.x6_options    = RAWCOOKIE_opts,
-	.xlate         = RAWCOOKIE_xlate,
+//	.xlate         = RAWCOOKIE_xlate,
 };
 
 void _init(void)

@@ -78,13 +78,16 @@ rawcookie_build_ip(struct net *net, struct sk_buff *skb, u32 saddr, u32 daddr)
 	struct iphdr *iph;
 
 	skb_reset_network_header(skb);
-	iph = skb_put(skb, sizeof(*iph));
+	iph = (struct iphdr *)skb_put(skb, sizeof(*iph));
 	iph->version	= 4;
 	iph->ihl	= sizeof(*iph) / 4;
 	iph->tos	= 0;
 	iph->id		= 0;
 	iph->frag_off	= htons(IP_DF);
-	iph->ttl	= net->ipv4_sysctl_ip_default_ttl;
+	// Kernel 3X
+	//iph->ttl	= net->ipv4_sysctl_ip_default_ttl;
+	// Kernel 4X	
+	iph->ttl	= net->ipv4.sysctl_ip_default_ttl;
 	iph->protocol	= IPPROTO_TCP;
 	iph->check	= 0;
 	iph->saddr	= saddr;
@@ -124,14 +127,17 @@ rawcookie_send_tcp(struct net *net,
 		goto free_nskb;
 	}
 
-
+/*
 	if (nfct) {
 		nf_ct_set(nskb, (struct nf_conn *)nfct, ctinfo);
 		nf_conntrack_get(nfct);
 	}
+*/
 
-
-	ip_local_out(nskb);
+	// Kernel 3.x
+//	ip_local_out(nskb);
+	// Kernel 4.x
+	ip_local_out(net, nskb->sk, nskb);
 
 	/* dst_output sice paket odesle ale je nejak divne zkraceny */
 //	dst_output(nskb);
@@ -200,7 +206,6 @@ rawcookie_send_client_synack(struct net *net,
 
 	iph = ip_hdr(skb);
 
-	
 	tcp_hdr_size = sizeof(*nth) + synproxy_options_size(opts);
 	nskb = alloc_skb(sizeof(*niph) + tcp_hdr_size + MAX_TCP_HEADER,
 			 GFP_ATOMIC);
@@ -211,7 +216,7 @@ rawcookie_send_client_synack(struct net *net,
 	niph = rawcookie_build_ip(net, nskb, iph->daddr, iph->saddr);
 
 	skb_reset_transport_header(nskb);
-	nth = skb_put(nskb, tcp_hdr_size);
+	nth = (struct tcphdr *)skb_put(nskb, tcp_hdr_size);
 	nth->source	= th->dest;
 	nth->dest	= th->source;
 	nth->seq	= htonl(__cookie_v4_init_sequence(iph, th, &mss));
@@ -228,14 +233,20 @@ rawcookie_send_client_synack(struct net *net,
 
 //	pr_debug("skb_nfct(skb): %p %p", skb, skb_nfct(skb));
 
-	nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
+	// Kernel 3.x
+	//nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
+	// Kernel 4.x
+	nskb->nfct = &nf_ct_untracked_get()->ct_general;
+        nskb->nfctinfo = IP_CT_NEW;
+        nf_conntrack_get(nskb->nfct);
+
 
 //	nskb->priority = skb->priority;
 	nskb->priority = 1;
 
 	nskb->queue_mapping = skb->queue_mapping;
 
-	rawcookie_send_tcp(net, skb, nskb, NULL,
+	rawcookie_send_tcp_raw(net, skb, nskb, NULL,
 			  IP_CT_ESTABLISHED_REPLY, niph, nth, tcp_hdr_size);
 }
 
