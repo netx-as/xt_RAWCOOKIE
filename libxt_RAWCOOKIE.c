@@ -15,6 +15,8 @@
 //#include <linux/netfilter/xt_SYNPROXY.h>
 #include "xt_RAWCOOKIE.h"
 
+#define MACLEN 6
+
 enum
 {
 	O_SACK_PERM = 0,
@@ -53,22 +55,6 @@ static const struct xt_option_entry RAWCOOKIE_opts[] = {
 	XTOPT_TABLEEND,
 };
 
-static const unsigned char* parse_mac(char *char_mac, unsigned char *int_mac)
-{
-	if (char_mac == NULL) {
-		return NULL;
-	}
-
-	unsigned int tmp_mac[6];
-	int i;
-
-	sscanf(char_mac, "%x:%x:%x:%x:%x:%x", &tmp_mac[0], &tmp_mac[1], &tmp_mac[2], &tmp_mac[3], &tmp_mac[4], &tmp_mac[5]);
-	for (i = 0; i < 6; i++)
-		int_mac[i] = (unsigned char)tmp_mac[i];
-
-	return int_mac;
-}
-
 static void RAWCOOKIE_parse(struct xt_option_call *cb)
 {
 	struct xt_rawcookie_info *info = cb->data;
@@ -100,8 +86,7 @@ static void RAWCOOKIE_parse(struct xt_option_call *cb)
 		break;
 	case O_TXMAC:
 		info->options |= XT_RAWCOOKIE_OPT_TXMAC;
-		//parse_mac(cb->data, info->txmac);
-		memcpy(info->txmac, cb->val.ethermac, ETH_ALEN);
+		memcpy(info->txmac, cb->val.ethermac, MACLEN);
 		break;
 	}
 }
