@@ -12,12 +12,15 @@
 
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter/x_tables.h>
-//#include <linux/netfilter/xt_SYNPROXY.h>
+#include <linux/netfilter/xt_SYNPROXY.h>
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_seqadj.h>
 #include <net/netfilter/nf_conntrack_synproxy.h>
 //
 #include "xt_RAWCOOKIE.h"
+
+//#define KERNEL3X 1
+// #define KERNEL4X 1
 
 
 
@@ -85,9 +88,13 @@ rawcookie_build_ip(struct net *net, struct sk_buff *skb, u32 saddr, u32 daddr)
 	iph->id		= 0;
 	iph->frag_off	= htons(IP_DF);
 	// Kernel 3X
-	//iph->ttl	= net->ipv4_sysctl_ip_default_ttl;
-	// Kernel 4X	
+#ifdef KERNEL3X
+	iph->ttl	= net->ipv4_sysctl_ip_default_ttl;
+#endif
+	// Kernel 4X
+#ifdef KERNEL4X
 	iph->ttl	= net->ipv4.sysctl_ip_default_ttl;
+#endif
 	iph->protocol	= IPPROTO_TCP;
 	iph->check	= 0;
 	iph->saddr	= saddr;
@@ -121,7 +128,7 @@ rawcookie_send_tcp(struct net *net,
 //	pr_debug("synproxy_send_tcp skb_dst(skb)->dev: %p", skb_dst(nskb)->dev);
 //	pr_debug("synproxy_send_tcp ip_hdr(skb): %p", ip_hdr(nskb));
 //	pr_debug("synproxy_send_tcp skb->sk: %p", nskb->sk);
-//	return; 
+//	return;
 
 	if (rawcookie_ip_route_me_harder(net, nskb, RTN_UNSPEC)) {
 		goto free_nskb;
@@ -134,10 +141,12 @@ rawcookie_send_tcp(struct net *net,
 	}
 */
 
-	// Kernel 3.x
-//	ip_local_out(nskb);
-	// Kernel 4.x
+#ifdef KERNEL3X
+	ip_local_out(nskb);
+#endif
+#ifdef KERNEL4X
 	ip_local_out(net, nskb->sk, nskb);
+#endif
 
 	/* dst_output sice paket odesle ale je nejak divne zkraceny */
 //	dst_output(nskb);
@@ -152,7 +161,8 @@ rawcookie_send_tcp_raw(struct net *net,
   const struct sk_buff *skb, struct sk_buff *nskb,
 		  struct nf_conntrack *nfct, enum ip_conntrack_info ctinfo,
 		  struct iphdr *niph, struct tcphdr *nth,
-		  unsigned int tcp_hdr_size)
+		  unsigned int tcp_hdr_size,
+		  const struct xt_rawcookie_info *info)
 {
 
 	struct ethhdr *eth_h;  /* Ethernet header */
@@ -178,8 +188,11 @@ rawcookie_send_tcp_raw(struct net *net,
 	eth_h = (struct ethhdr *) skb_push(nskb, ETH_HLEN);
 
 	memcpy(eth_h->h_source, nskb->dev->dev_addr, ETH_ALEN);
-	// switch HP 4c:ae:a3:6a:80:bc 
-	memcpy(eth_h->h_dest,"\x4c\xae\xa3\x6a\x80\xbc", ETH_ALEN);
+
+	// switch HP 4c:ae:a3:6a:80:bc
+	//memcpy(eth_h->h_dest, "\x4c\xae\xa3\x6a\x80\xbc", ETH_ALEN);
+	memcpy(eth_h->h_dest, info->txmac, ETH_ALEN);
+
 	eth_h->h_proto = nskb->protocol;
 
 
@@ -196,7 +209,8 @@ rawcookie_send_tcp_raw(struct net *net,
 static void
 rawcookie_send_client_synack(struct net *net,
 			    const struct sk_buff *skb, const struct tcphdr *th,
-			    const struct synproxy_options *opts)
+			    const struct synproxy_options *opts,
+				const struct xt_rawcookie_info *info)
 {
 	struct sk_buff *nskb;
 	struct iphdr *iph, *niph;
@@ -231,23 +245,31 @@ rawcookie_send_client_synack(struct net *net,
 
 	synproxy_build_options(nth, opts);
 
-//	pr_debug("skb_nfct(skb): %p %p", skb, skb_nfct(skb));
 
-	// Kernel 3.x
-	//nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
-	// Kernel 4.x
+	//pr_debug("skb_nfct(skb): %p %p", skb, skb_nfct(skb));
+
+#ifdef KERNEL3X
+	nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
+#endif
+#ifdef KERNEL4X
 	nskb->nfct = &nf_ct_untracked_get()->ct_general;
         nskb->nfctinfo = IP_CT_NEW;
         nf_conntrack_get(nskb->nfct);
-
+#endif
 
 //	nskb->priority = skb->priority;
 	nskb->priority = 1;
 
 	nskb->queue_mapping = skb->queue_mapping;
 
-	rawcookie_send_tcp_raw(net, skb, nskb, NULL,
-			  IP_CT_ESTABLISHED_REPLY, niph, nth, tcp_hdr_size);
+
+	if (info->options & XT_RAWCOOKIE_OPT_SENDDIRECT) {
+		rawcookie_send_tcp_raw(net, skb, nskb, NULL,
+			IP_CT_ESTABLISHED_REPLY, niph, nth, tcp_hdr_size, info);
+	} else if (info->options & XT_RAWCOOKIE_OPT_SENDLOCAL) {
+		rawcookie_send_tcp(net, skb, nskb, NULL,
+			IP_CT_ESTABLISHED_REPLY, niph, nth, tcp_hdr_size);
+	}
 }
 
 
@@ -302,7 +324,7 @@ rawcookie_tg4(struct sk_buff *skb, const struct xt_action_param *par)
 					  XT_RAWCOOKIE_OPT_SACK_PERM |
 					  XT_RAWCOOKIE_OPT_ECN);
 
-		rawcookie_send_client_synack(net, skb, th, &opts);
+		rawcookie_send_client_synack(net, skb, th, &opts, info);
 		return NF_DROP;
 
 	} else if (th->ack && !(th->fin || th->rst || th->syn)) {
