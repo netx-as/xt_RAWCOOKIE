@@ -1,7 +1,7 @@
 #!/bin/bash
 
 make clean
-make CFLAGS=-DKERNEL3X=1
+make
 #make install
 
 iptables -F -t raw
