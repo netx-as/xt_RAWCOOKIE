@@ -8,6 +8,7 @@
 
 #include <linux/module.h>
 #include <linux/skbuff.h>
+#include <linux/version.h>
 #include <net/tcp.h>
 
 #include <linux/netfilter_ipv4/ip_tables.h>
@@ -19,10 +20,9 @@
 //
 #include "xt_RAWCOOKIE.h"
 
-//#define KERNEL3X 1
-// #define KERNEL4X 1
-
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
+#error "The module is not supported on this kernel. Use >= 3.10.0"
+#endif
 
 int rawcookie_ip_route_me_harder(struct net *net, struct sk_buff *skb, unsigned int addr_type)
 {
@@ -87,13 +87,10 @@ rawcookie_build_ip(struct net *net, struct sk_buff *skb, u32 saddr, u32 daddr)
 	iph->tos	= 0;
 	iph->id		= 0;
 	iph->frag_off	= htons(IP_DF);
-	// Kernel 3X
-#ifdef KERNEL3X
-	iph->ttl	= net->ipv4_sysctl_ip_default_ttl;
-#endif
-	// Kernel 4X
-#ifdef KERNEL4X
-	iph->ttl	= net->ipv4.sysctl_ip_default_ttl;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+	iph->ttl = net->ipv4.sysctl_ip_default_ttl;
+#else
+	iph->ttl = net->ipv4_sysctl_ip_default_ttl;
 #endif
 	iph->protocol	= IPPROTO_TCP;
 	iph->check	= 0;
@@ -141,11 +138,12 @@ rawcookie_send_tcp(struct net *net,
 	}
 */
 
-#ifdef KERNEL3X
-	ip_local_out(nskb);
-#endif
-#ifdef KERNEL4X
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
 	ip_local_out(net, nskb->sk, nskb);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
+	ip_local_out(nskb);
+#else
+#error "The module is not supported on this kernel. Use >= 2.6.25"
 #endif
 
 	/* dst_output sice paket odesle ale je nejak divne zkraceny */
@@ -248,13 +246,14 @@ rawcookie_send_client_synack(struct net *net,
 
 	//pr_debug("skb_nfct(skb): %p %p", skb, skb_nfct(skb));
 
-#ifdef KERNEL3X
-	nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
-#endif
-#ifdef KERNEL4X
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
 	nskb->nfct = &nf_ct_untracked_get()->ct_general;
-        nskb->nfctinfo = IP_CT_NEW;
-        nf_conntrack_get(nskb->nfct);
+	nskb->nfctinfo = IP_CT_NEW;
+	nf_conntrack_get(nskb->nfct);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+	nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
+#else
+#error "The module is not supported on this kernel. Use >= 3.10"
 #endif
 
 //	nskb->priority = skb->priority;
