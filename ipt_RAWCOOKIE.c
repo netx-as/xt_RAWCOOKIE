@@ -246,16 +246,6 @@ rawcookie_send_client_synack(struct net *net,
 
 	//pr_debug("skb_nfct(skb): %p %p", skb, skb_nfct(skb));
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
-	nskb->nfct = &nf_ct_untracked_get()->ct_general;
-	nskb->nfctinfo = IP_CT_NEW;
-	nf_conntrack_get(nskb->nfct);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
-	nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
-#else
-#error "The module is not supported on this kernel. Use >= 3.10"
-#endif
-
 //	nskb->priority = skb->priority;
 	nskb->priority = 1;
 
@@ -266,6 +256,17 @@ rawcookie_send_client_synack(struct net *net,
 		rawcookie_send_tcp_raw(net, skb, nskb, NULL,
 			IP_CT_ESTABLISHED_REPLY, niph, nth, tcp_hdr_size, info);
 	} else if (info->options & XT_RAWCOOKIE_OPT_SENDLOCAL) {
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+		nskb->nfct = &nf_ct_untracked_get()->ct_general;
+		nskb->nfctinfo = IP_CT_NEW;
+		nf_conntrack_get(nskb->nfct);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
+		// backported from kernel 4.11 - centos7
+		nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
+#else
+#error "The module is not supported on this kernel. Use >= 3.10"
+#endif
 		rawcookie_send_tcp(net, skb, nskb, NULL,
 			IP_CT_ESTABLISHED_REPLY, niph, nth, tcp_hdr_size);
 	}
