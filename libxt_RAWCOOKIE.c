@@ -47,7 +47,7 @@ static const struct xt_option_entry RAWCOOKIE_opts[] = {
 	{.name = "mss",       .id = O_MSS,       .type = XTTYPE_UINT32, },
 	{.name = "ecn",       .id = O_ECN,	 .type = XTTYPE_NONE, },
 	{.name = "senddirect",   .id = O_SENDDIRECT,	 .type = XTTYPE_NONE, },
-	{.name = "txmac",     .id = O_TXMAC,	 .type = XTTYPE_STRING, },
+	{.name = "txmac",     .id = O_TXMAC,	 .type = XTTYPE_ETHERMAC, },
 	XTOPT_TABLEEND,
 };
 
