@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <xtables.h>
-//#include <linux/netfilter/xt_SYNPROXY.h>
 #include "xt_RAWCOOKIE.h"
 
 #define MACLEN 6
@@ -24,7 +23,6 @@ enum
 	O_WSCALE,
 	O_MSS,
 	O_ECN,
-	O_SENDLOCAL,
 	O_SENDDIRECT,
 	O_TXMAC,
 };
@@ -38,7 +36,6 @@ static void RAWCOOKIE_help(void)
 "  --wscale value                     Set window scaling factor\n"
 "  --mss value                        Set MSS value\n"
 "  --ecn                              Set ECN\n"
-"  --sendlocal                        Set send to localout\n"
 "  --senddirect                       Set send to direct\n"
 "  --txmac                            Set tx mac address\n");
 }
@@ -49,7 +46,6 @@ static const struct xt_option_entry RAWCOOKIE_opts[] = {
 	{.name = "wscale",    .id = O_WSCALE,    .type = XTTYPE_UINT32, },
 	{.name = "mss",       .id = O_MSS,       .type = XTTYPE_UINT32, },
 	{.name = "ecn",       .id = O_ECN,	 .type = XTTYPE_NONE, },
-	{.name = "sendlocal",   .id = O_SENDLOCAL,	 .type = XTTYPE_NONE, },
 	{.name = "senddirect",   .id = O_SENDDIRECT,	 .type = XTTYPE_NONE, },
 	{.name = "txmac",     .id = O_TXMAC,	 .type = XTTYPE_STRING, },
 	XTOPT_TABLEEND,
@@ -77,9 +73,6 @@ static void RAWCOOKIE_parse(struct xt_option_call *cb)
 		break;
 	case O_ECN:
 		info->options |= XT_RAWCOOKIE_OPT_ECN;
-		break;
-	case O_SENDLOCAL:
-		info->options |= XT_RAWCOOKIE_OPT_SENDLOCAL;
 		break;
 	case O_SENDDIRECT:
 		info->options |= XT_RAWCOOKIE_OPT_SENDDIRECT;
@@ -112,8 +105,6 @@ static void RAWCOOKIE_print(const void *ip, const struct xt_entry_target *target
 		printf("mss %u ", info->mss);
 	if (info->options & XT_RAWCOOKIE_OPT_ECN)
 		printf("ecn ");
-	if (info->options & XT_RAWCOOKIE_OPT_SENDLOCAL)
-		printf("sendlocal ");
 	if (info->options & XT_RAWCOOKIE_OPT_SENDDIRECT)
 		printf("senddirect ");
 	if (info->options & XT_RAWCOOKIE_OPT_TXMAC)
@@ -135,37 +126,11 @@ static void RAWCOOKIE_save(const void *ip, const struct xt_entry_target *target)
 		printf(" --mss %u", info->mss);
 	if (info->options & XT_RAWCOOKIE_OPT_ECN)
 		printf(" --ecn");
-	if (info->options & XT_RAWCOOKIE_OPT_SENDLOCAL)
-		printf(" --sendlocal");
 	if (info->options & XT_RAWCOOKIE_OPT_SENDDIRECT)
 		printf(" --senddirect");
 	if (info->options & XT_RAWCOOKIE_OPT_TXMAC)
 		printf(" --txmac %s", info->txmac);
 }
-
-/*
-static int RAWCOOKIE_xlate(struct xt_xlate *xl,
-		          const struct xt_xlate_tg_params *params)
-{
-	const struct xt_rawcookie_info *info =
-		(const struct xt_rawcookie_info *)params->target->data;
-
-	xt_xlate_add(xl, " rawcookie ");
-
-	if (info->options & XT_RAWCOOKIE_OPT_SACK_PERM)
-		xt_xlate_add(xl, "sack-perm ");
-	if (info->options & XT_RAWCOOKIE_OPT_TIMESTAMP)
-		xt_xlate_add(xl, "timestamp ");
-	if (info->options & XT_RAWCOOKIE_OPT_WSCALE)
-		xt_xlate_add(xl, "wscale %u ", info->wscale);
-	if (info->options & XT_RAWCOOKIE_OPT_MSS)
-		xt_xlate_add(xl, "mss %u ", info->mss);
-	if (info->options & XT_RAWCOOKIE_OPT_ECN)
-		xt_xlate_add(xl, "ecn ");
-
-	return 1;
-}
-*/
 
 static struct xtables_target rawcookie_tg_reg = {
 	.family        = NFPROTO_UNSPEC,
@@ -180,7 +145,6 @@ static struct xtables_target rawcookie_tg_reg = {
 	.x6_parse      = RAWCOOKIE_parse,
 	.x6_fcheck     = RAWCOOKIE_check,
 	.x6_options    = RAWCOOKIE_opts,
-//	.xlate         = RAWCOOKIE_xlate,
 };
 
 void _init(void)

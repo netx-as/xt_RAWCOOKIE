@@ -41,9 +41,8 @@ int rawcookie_ip_route_me_harder(struct net *net, struct sk_buff *skb, unsigned 
     else
         saddr = 0;
 
-    /* some non-standard hacks like ipt_REJECT.c:send_reset() can cause
- *      * packets with foreign saddr to appear on the NF_INET_LOCAL_OUT hook.
- *           */
+    /* 	some non-standard hacks like ipt_REJECT.c:send_reset() can cause
+		packets with foreign saddr to appear on the NF_INET_LOCAL_OUT hook. */
     fl4.daddr = iph->daddr;
     fl4.saddr = saddr;
     fl4.flowi4_tos = RT_TOS(iph->tos);
@@ -70,9 +69,6 @@ int rawcookie_ip_route_me_harder(struct net *net, struct sk_buff *skb, unsigned 
 
     return 0;
 }
-
-
-
 
 
 static struct iphdr *
@@ -108,10 +104,6 @@ rawcookie_send_tcp(struct net *net,
 		  unsigned int tcp_hdr_size)
 {
 
-
-//	kfree_skb(nskb);
-//	return;
-
 	nth->check = ~tcp_v4_check(tcp_hdr_size, niph->saddr, niph->daddr, 0);
 	nskb->ip_summed   = CHECKSUM_PARTIAL;
 	nskb->csum_start  = (unsigned char *)nth - nskb->head;
@@ -120,23 +112,9 @@ rawcookie_send_tcp(struct net *net,
 	skb_dst_set_noref(nskb, skb_dst(skb));
 	nskb->protocol = htons(ETH_P_IP);
 
-//	pr_debug("synproxy_send_tcp #1 %p", nskb);
-//	pr_debug("synproxy_send_tcp skb_dst(skb): %p", skb_dst(nskb));
-//	pr_debug("synproxy_send_tcp skb_dst(skb)->dev: %p", skb_dst(nskb)->dev);
-//	pr_debug("synproxy_send_tcp ip_hdr(skb): %p", ip_hdr(nskb));
-//	pr_debug("synproxy_send_tcp skb->sk: %p", nskb->sk);
-//	return;
-
 	if (rawcookie_ip_route_me_harder(net, nskb, RTN_UNSPEC)) {
 		goto free_nskb;
 	}
-
-/*
-	if (nfct) {
-		nf_ct_set(nskb, (struct nf_conn *)nfct, ctinfo);
-		nf_conntrack_get(nfct);
-	}
-*/
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
 	ip_local_out(net, nskb->sk, nskb);
@@ -146,8 +124,6 @@ rawcookie_send_tcp(struct net *net,
 #error "The module is not supported on this kernel. Use >= 2.6.25"
 #endif
 
-	/* dst_output sice paket odesle ale je nejak divne zkraceny */
-//	dst_output(nskb);
 	return;
 
 free_nskb:
@@ -166,9 +142,6 @@ rawcookie_send_tcp_raw(struct net *net,
 	struct ethhdr *eth_h;  /* Ethernet header */
 	int ret;
 
-//	kfree_skb(nskb);
-//	return;
-
 	nth->check = ~tcp_v4_check(tcp_hdr_size, niph->saddr, niph->daddr, 0);
 	nskb->ip_summed   = CHECKSUM_PARTIAL;
 	nskb->csum_start  = (unsigned char *)nth - nskb->head;
@@ -186,16 +159,12 @@ rawcookie_send_tcp_raw(struct net *net,
 	eth_h = (struct ethhdr *) skb_push(nskb, ETH_HLEN);
 
 	memcpy(eth_h->h_source, nskb->dev->dev_addr, ETH_ALEN);
-
-	// switch HP 4c:ae:a3:6a:80:bc
-	//memcpy(eth_h->h_dest, "\x4c\xae\xa3\x6a\x80\xbc", ETH_ALEN);
 	memcpy(eth_h->h_dest, info->txmac, ETH_ALEN);
 
 	eth_h->h_proto = nskb->protocol;
 
 
 	ret = dev_queue_xmit(nskb);
-//	pr_debug("xt_rawcookie1: dev_queue_xmit failed. errno=%d.\n", -ret);
     if (ret != 0) {
         pr_debug("xt_rawcookie2: dev_queue_xmit failed. errno=%d.\n", -ret);
         kfree_skb(nskb);
@@ -203,6 +172,7 @@ rawcookie_send_tcp_raw(struct net *net,
 
 	return;
 }
+
 
 static void
 rawcookie_send_client_synack(struct net *net,
@@ -242,11 +212,6 @@ rawcookie_send_client_synack(struct net *net,
 	nth->urg_ptr	= 0;
 
 	synproxy_build_options(nth, opts);
-
-
-	//pr_debug("skb_nfct(skb): %p %p", skb, skb_nfct(skb));
-
-//	nskb->priority = skb->priority;
 	nskb->priority = 1;
 
 	nskb->queue_mapping = skb->queue_mapping;
@@ -255,14 +220,14 @@ rawcookie_send_client_synack(struct net *net,
 	if (info->options & XT_RAWCOOKIE_OPT_SENDDIRECT) {
 		rawcookie_send_tcp_raw(net, skb, nskb, NULL,
 			IP_CT_ESTABLISHED_REPLY, niph, nth, tcp_hdr_size, info);
-	} else if (info->options & XT_RAWCOOKIE_OPT_SENDLOCAL) {
+	} else {
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
 		nskb->nfct = &nf_ct_untracked_get()->ct_general;
 		nskb->nfctinfo = IP_CT_NEW;
 		nf_conntrack_get(nskb->nfct);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
-		// backported from kernel 4.11 - centos7
+		/* backported from kernel 4.11 - centos7 */
 		nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
 #else
 #error "The module is not supported on this kernel. Use >= 3.10"
@@ -328,8 +293,6 @@ rawcookie_tg4(struct sk_buff *skb, const struct xt_action_param *par)
 		return NF_DROP;
 
 	} else if (th->ack && !(th->fin || th->rst || th->syn)) {
-		/* ACK from client */
-//		synproxy_recv_client_ack(net, skb, th, &opts, ntohl(th->seq));
 		return NF_DROP;
 	}
 
@@ -358,7 +321,6 @@ static void rawcookie_tg4_destroy(const struct xt_tgdtor_param *par)
 static struct xt_target synproxy_tg4_reg __read_mostly = {
 	.name		= "RAWCOOKIE",
 	.family		= NFPROTO_IPV4,
-//	.hooks		= (1 << NF_INET_LOCAL_IN) | (1 << NF_INET_FORWARD),
 	.target		= rawcookie_tg4,
 	.targetsize	= sizeof(struct xt_rawcookie_info),
 	.checkentry	= rawcookie_tg4_check,
@@ -377,7 +339,6 @@ static int __init synproxy_tg4_init(void)
 static void __exit synproxy_tg4_exit(void)
 {
 	xt_unregister_target(&synproxy_tg4_reg);
-//	nf_unregister_hooks(ipv4_synproxy_ops, ARRAY_SIZE(ipv4_synproxy_ops));
 }
 
 module_init(synproxy_tg4_init);
@@ -386,4 +347,3 @@ module_exit(synproxy_tg4_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Tomas Podermanski <tpoder@netx.as>");
 MODULE_DESCRIPTION("SYNCOOKIE performance helper module for SYNPROXY");
-
