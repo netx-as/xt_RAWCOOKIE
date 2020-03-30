@@ -43,3 +43,19 @@ get sources from git
 # make install
 
 
+SOURCES
+
+==============================
+
+For sources please visit: https://github.com/netx-as/xt_RAWCOOKIE
+
+
+LICENSE
+
+==============================
+
+RAWCOKIE module is based on Linux SYNCOKIE module as is provided under same license as the SYNCOOKIE module.
+
+
+
+
