@@ -159,7 +159,13 @@ rawcookie_send_tcp_raw(struct net *net,
 	eth_h = (struct ethhdr *) skb_push(nskb, ETH_HLEN);
 
 	memcpy(eth_h->h_source, nskb->dev->dev_addr, ETH_ALEN);
-	memcpy(eth_h->h_dest, info->txmac, ETH_ALEN);
+
+	if (info->options & XT_RAWCOOKIE_OPT_TXMAC) {
+		memcpy(eth_h->h_dest, info->txmac, ETH_ALEN);
+	} else {
+		struct ethhdr *rec_eth_h = eth_hdr(skb);
+		memcpy(eth_h->h_dest, rec_eth_h->h_source, ETH_ALEN);
+	}
 
 	eth_h->h_proto = nskb->protocol;
 
