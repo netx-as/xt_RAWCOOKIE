@@ -1,7 +1,7 @@
 RAWCOOKIE
 =======
 
-RAWCOOKIE is a SYNPROXY module extension which moves initial SYN+ACK conversation into lower levels of kernel. It replaces original "-j CT --notrack" rule in iptables with RAWCOOKIE targes.
+RAWCOOKIE is a SYNPROXY module extension which moves initial SYN+ACK conversation into lower levels of kernel. It replaces original `-j CT --notrack` rule in iptables with RAWCOOKIE targes.
 
 Example
 ---------------
@@ -24,11 +24,11 @@ Direct mode
 
 RAWCOOKIE module supports special mode for sending initial SYN+ACK packet when the packet avoids Linux routing system. The SYN+ACK packet is send directly to the MAC addres (the address of the router)  which we received the original SYN packet from. The direct mode can be enable via `--senddirect` option.
 
-In case when it is necessary to override the destination MAC address there is option txmac which can do it for you.
+In case when it is necessary to override the destination MAC address there is option `--txmac` which can do it for you.
 
 ```--txmac 4c:ae:a3:6a:80:bc```
 
-NOTE: Please do not set --txmac option if you are not sure how this option works. By setting invalid/not existing MAC address you might flood packets to all ethernet ports whet the server is connected to!
+> NOTE: Please do not set `--txmac` option if you are not sure how this option works. By setting invalid/not existing MAC address you might flood packets to all ethernet ports whet the server is connected to!
 
 
 Build from sources
