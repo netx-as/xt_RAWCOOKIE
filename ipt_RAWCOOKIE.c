@@ -164,7 +164,13 @@ rawcookie_send_tcp_raw(struct net *net,
 		memcpy(eth_h->h_dest, info->txmac, ETH_ALEN);
 	} else {
 		struct ethhdr *rec_eth_h = eth_hdr(skb);
-		memcpy(eth_h->h_dest, rec_eth_h->h_source, ETH_ALEN);
+		if (rec_eth_h != NULL) {
+			memcpy(eth_h->h_dest, rec_eth_h->h_source, ETH_ALEN);
+		} else {
+			pr_debug("xt_rawcookie2: received pck src mac address copy failed.\n");
+			kfree_skb(nskb);
+			return;
+		}
 	}
 
 	eth_h->h_proto = nskb->protocol;

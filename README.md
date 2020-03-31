@@ -41,6 +41,8 @@ Build from sources
 # make install
 ```
 
+> It is required to have kernel and iptables sources installed.
+
 Sources
 ---------------
 
