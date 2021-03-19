@@ -1,0 +1,15 @@
+Source: xt-rawcookie
+Section: net
+Priority: optional
+Maintainer: Petr Studeny <ops@nangu.tv>
+Build-Depends: debhelper-compat (= 12)
+Standards-Version: 4.4.1
+Homepage: https://github.com/netx-as/xt_RAWCOOKIE
+
+Package: xt-rawcookie
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: RAWCOOKIE is a SYNPROXY module extension
+ RAWCOOKIE is a SYNPROXY module extension which moves initial SYN+ACK
+ conversation into lower levels of kernel.
+ It replaces original `-j CT --notrack` rule in iptables with RAWCOOKIE targes.
