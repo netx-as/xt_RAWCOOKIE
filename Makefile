@@ -18,7 +18,7 @@ $(MODULE_LIB).o: $(MODULE_LIB).c
 
 clean:
 	make -C $(MODPATH)/build/ M=$(PWD) clean
-	rm $(MODULE_LIB).so
+	rm -f $(MODULE_LIB).so
 
 install:
 	install $(MODULE_NAME).ko $(MODPATH)/kernel/net/netfilter
