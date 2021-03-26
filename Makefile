@@ -22,7 +22,8 @@ clean:
 
 install:
 	install $(MODULE_NAME).ko $(MODPATH)/kernel/net/netfilter
-	install $(MODULE_LIB).so /lib/xtables
+	# install $(MODULE_LIB).so /usr/lib/x86_64-linux-gnu/xtables
+	install $(MODULE_LIB).so /usr/lib64/xtables
 
 tar:
 	tar cvzf xt_RAWCOOKIE-$(MODULE_VERSION).tar.gz --transform 's,^,xt_RAWCOOKIE-$(MODULE_VERSION)/,' *.c *.h Makefile

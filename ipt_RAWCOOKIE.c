@@ -17,6 +17,12 @@
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_seqadj.h>
 #include <net/netfilter/nf_conntrack_synproxy.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
+#include <linux/netfilter/nf_synproxy.h>
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+#include <net/netfilter/nf_synproxy.h>
+#endif
 //
 #include "xt_RAWCOOKIE.h"
 
@@ -24,7 +30,66 @@
 #error "The module is not supported on this kernel. Use >= 3.10.0"
 #endif
 
-int rawcookie_ip_route_me_harder(struct net *net, struct sk_buff *skb, unsigned int addr_type)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+static unsigned int
+synproxy_options_size(const struct synproxy_options *opts)
+{
+	unsigned int size = 0;
+
+	if (opts->options & NF_SYNPROXY_OPT_MSS)
+		size += TCPOLEN_MSS_ALIGNED;
+	if (opts->options & NF_SYNPROXY_OPT_TIMESTAMP)
+		size += TCPOLEN_TSTAMP_ALIGNED;
+	else if (opts->options & NF_SYNPROXY_OPT_SACK_PERM)
+		size += TCPOLEN_SACKPERM_ALIGNED;
+	if (opts->options & NF_SYNPROXY_OPT_WSCALE)
+		size += TCPOLEN_WSCALE_ALIGNED;
+
+	return size;
+}
+
+
+static void
+synproxy_build_options(struct tcphdr *th, const struct synproxy_options *opts)
+{
+	__be32 *ptr = (__be32 *)(th + 1);
+	u8 options = opts->options;
+
+	if (options & NF_SYNPROXY_OPT_MSS)
+		*ptr++ = htonl((TCPOPT_MSS << 24) |
+			       (TCPOLEN_MSS << 16) |
+			       opts->mss_option);
+
+	if (options & NF_SYNPROXY_OPT_TIMESTAMP) {
+		if (options & NF_SYNPROXY_OPT_SACK_PERM)
+			*ptr++ = htonl((TCPOPT_SACK_PERM << 24) |
+				       (TCPOLEN_SACK_PERM << 16) |
+				       (TCPOPT_TIMESTAMP << 8) |
+				       TCPOLEN_TIMESTAMP);
+		else
+			*ptr++ = htonl((TCPOPT_NOP << 24) |
+				       (TCPOPT_NOP << 16) |
+				       (TCPOPT_TIMESTAMP << 8) |
+				       TCPOLEN_TIMESTAMP);
+
+		*ptr++ = htonl(opts->tsval);
+		*ptr++ = htonl(opts->tsecr);
+	} else if (options & NF_SYNPROXY_OPT_SACK_PERM)
+		*ptr++ = htonl((TCPOPT_NOP << 24) |
+			       (TCPOPT_NOP << 16) |
+			       (TCPOPT_SACK_PERM << 8) |
+			       TCPOLEN_SACK_PERM);
+
+	if (options & NF_SYNPROXY_OPT_WSCALE)
+		*ptr++ = htonl((TCPOPT_NOP << 24) |
+			       (TCPOPT_WINDOW << 16) |
+			       (TCPOLEN_WINDOW << 8) |
+			       opts->wscale);
+}
+#endif
+
+int
+rawcookie_ip_route_me_harder(struct net *net, struct sk_buff *skb, unsigned int addr_type)
 {
 //    struct net *net = dev_net(skb_dst(skb)->dev);
     const struct iphdr *iph = ip_hdr(skb);
@@ -130,6 +195,7 @@ free_nskb:
 	kfree_skb(nskb);
 }
 
+
 static void
 rawcookie_send_tcp_raw(struct net *net,
   const struct sk_buff *skb, struct sk_buff *nskb,
@@ -196,7 +262,12 @@ rawcookie_send_client_synack(struct net *net,
 	struct iphdr *iph, *niph;
 	struct tcphdr *nth;
 	unsigned int tcp_hdr_size;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0)
+	u16 mss = opts->mss_encode;
+#else
 	u16 mss = opts->mss;
+#endif
 
 	iph = ip_hdr(skb);
 
@@ -234,7 +305,9 @@ rawcookie_send_client_synack(struct net *net,
 			IP_CT_ESTABLISHED_REPLY, niph, nth, tcp_hdr_size, info);
 	} else {
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+		nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
 		nskb->nfct = &nf_ct_untracked_get()->ct_general;
 		nskb->nfctinfo = IP_CT_NEW;
 		nf_conntrack_get(nskb->nfct);
@@ -250,11 +323,16 @@ rawcookie_send_client_synack(struct net *net,
 }
 
 
-void rawcookie_init_timestamp_cookie(const struct xt_rawcookie_info *info,
+void
+rawcookie_init_timestamp_cookie(const struct xt_rawcookie_info *info,
 				    struct synproxy_options *opts)
 {
 	opts->tsecr = opts->tsval;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+	opts->tsval = tcp_jiffies32 & ~0x3f;
+#else
 	opts->tsval = tcp_time_stamp & ~0x3f;
+#endif
 	if (opts->options & XT_RAWCOOKIE_OPT_WSCALE) {
 		opts->tsval |= opts->wscale;
 		opts->wscale = info->wscale;
@@ -271,20 +349,33 @@ static unsigned int
 rawcookie_tg4(struct sk_buff *skb, const struct xt_action_param *par)
 {
 	const struct xt_rawcookie_info *info = par->targinfo;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
+	struct net *net = dev_net(xt_in(par));
+#else
 	struct net *net = dev_net(par->in);
+#endif
+
+
 	struct synproxy_net *snet = synproxy_pernet(net);
 	struct synproxy_options opts = {};
 	struct tcphdr *th, _th;
 
-	if (nf_ip_checksum(skb, par->hooknum, par->thoff, IPPROTO_TCP))
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
+	if (nf_ip_checksum(skb, xt_hooknum(par), par->thoff, IPPROTO_TCP)) {
+#else
+	if (nf_ip_checksum(skb, par->hooknum, par->thoff, IPPROTO_TCP)) {
+#endif
 		return NF_DROP;
+	}
 
 	th = skb_header_pointer(skb, par->thoff, sizeof(_th), &_th);
 	if (th == NULL)
 		return NF_DROP;
 
-	if (!synproxy_parse_options(skb, par->thoff, th, &opts))
+	if (!synproxy_parse_options(skb, par->thoff, th, &opts)) {
 		return NF_DROP;
+	}
 
 	if (th->syn && !(th->ack || th->fin || th->rst)) {
 		/* Initial SYN from client */
@@ -312,7 +403,8 @@ rawcookie_tg4(struct sk_buff *skb, const struct xt_action_param *par)
 }
 
 
-static int rawcookie_tg4_check(const struct xt_tgchk_param *par)
+static int
+rawcookie_tg4_check(const struct xt_tgchk_param *par)
 {
 	const struct ipt_entry *e = par->entryinfo;
 
@@ -320,14 +412,14 @@ static int rawcookie_tg4_check(const struct xt_tgchk_param *par)
 	    e->ip.invflags & XT_INV_PROTO)
 		return -EINVAL;
 
-	return nf_ct_l3proto_try_module_get(par->family);
+	return nf_ct_netns_get(par->net, par->family);
 }
+
 
 static void rawcookie_tg4_destroy(const struct xt_tgdtor_param *par)
 {
-	nf_ct_l3proto_module_put(par->family);
+	nf_ct_netns_put(par->net, par->family);
 }
-
 
 
 static struct xt_target synproxy_tg4_reg __read_mostly = {
