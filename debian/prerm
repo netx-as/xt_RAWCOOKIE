@@ -19,11 +19,10 @@ set -e
 
 case "$1" in
     remove|upgrade|deconfigure)
-        #TODO rmmod out module; insmod orig module
+        rmmod ipt_RAWCOOKIE
     ;;
 
     failed-upgrade)
-        #TODO rmmod out module; insmod orig module
     ;;
 
     *)
