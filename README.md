@@ -45,6 +45,17 @@ Build from sources
 
 > It is required to have kernel and iptables sources installed.
 
+Build debian package
+---------------
+
+Make sure you have installed build-essential
+
+```
+dpkg-buildpackage -b -us -uc
+```
+
+On failure, install source dependencies.
+
 Sources
 ---------------
 
