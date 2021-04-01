@@ -13,9 +13,19 @@
 # package maintainers to append LDFLAGS
 #export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
+# parse kernel version from the changelog
+export CHANGELOG_KERNEL_VERSION := $(shell dpkg-parsechangelog -SVersion |cut -d '~' -f2)-amd64
+
+# parse kernel version from meta package
+export KERNEL_VERSION := $(shell apt-cache depends linux-headers-amd64 |tail -n1 |sed -e 's/^.*linux-headers-//')
 
 %:
+ifeq ($(CHANGELOG_KERNEL_VERSION), $(KERNEL_VERSION))
 	dh $@
+else
+	@echo "[ERROR] Changelog kernel mismatched installed linux-headers-amd64 meta package"
+	@false
+endif
 
 
 # dh_make generated override targets

@@ -2,7 +2,7 @@ Source: xt-rawcookie
 Section: net
 Priority: optional
 Maintainer: Petr Studeny <ops@nangu.tv>
-Build-Depends: debhelper-compat (= 12), linux-headers-amd64, linux-source, iptables-dev
+Build-Depends: debhelper-compat (= 12), linux-headers-amd64, iptables-dev
 Standards-Version: 4.4.1
 Homepage: https://github.com/netx-as/xt_RAWCOOKIE
 
