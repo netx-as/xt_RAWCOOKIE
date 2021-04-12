@@ -1,3 +1,15 @@
+xt-rawcookie (1.0.2~4.19.0-0.bpo.16) unstable; urgency=medium
+
+  * Build for 4.19.0-0.bpo.16_amd64
+
+ -- Petr Studeny <petr.studeny@nangu.tv>  Thu, 12 Apr 2021 15:37:00 +0200
+
+xt-rawcookie (1.0.2~4.19.0-16) unstable; urgency=medium
+
+  * Build for 4.19.0-16_amd64
+
+ -- Petr Studeny <petr.studeny@nangu.tv>  Thu, 01 Apr 2021 15:37:00 +0200
+
 xt-rawcookie (1.0.2) unstable; urgency=medium
 
   * Initial release 
