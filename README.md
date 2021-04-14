@@ -7,18 +7,18 @@ Example
 ---------------
 
 Original rules with SYNPROXY module:
- ```
- iptables -t raw -A PREROUTING -i tge22 -p tcp -m tcp --syn --dport 80 -j CT --notrack
- iptables -A INPUT -i tge22 -p tcp -m tcp --dport 80 -m state --state INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
- iptables -A INPUT -i tge22 -p tcp -m tcp --dport 80 -m state --state INVALID -j DROP
- ```
+```
+iptables -t raw -A PREROUTING -i tge22 -p tcp -m tcp --syn --dport 80 -j CT --notrack
+iptables -A INPUT -i tge22 -p tcp -m tcp --dport 80 -m state --state INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
+iptables -A INPUT -i tge22 -p tcp -m tcp --dport 80 -m state --state INVALID -j DROP
+```
 
 Must be replaced with:
- ```
- iptables -t raw -A PREROUTING -i tge22 -p tcp -m tcp --syn --dport 80 -j RAWCOOKIE --sack-perm --timestamp --wscale 7 --mss 1460 --senddirect
- iptables -A INPUT -i tge22 -p tcp -m tcp --dport 80 -m state --state INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
- iptables -A INPUT -i tge22 -p tcp -m tcp --dport 80 -m state --state INVALID -j DROP
- ```
+```
+iptables -t raw -A PREROUTING -i tge22 -p tcp -m tcp --syn --dport 80 -j RAWCOOKIE --sack-perm --timestamp --wscale 7 --mss 1460 --senddirect
+iptables -A INPUT -i tge22 -p tcp -m tcp --dport 80 -m state --state INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
+iptables -A INPUT -i tge22 -p tcp -m tcp --dport 80 -m state --state INVALID -j DROP
+```
 
 
 Direct mode
