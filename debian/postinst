@@ -20,8 +20,6 @@ set -e
 
 case "$1" in
     configure)
-        rmmod ipt_RAWCOOKIE || true
-        modprobe -v ipt_RAWCOOKIE
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

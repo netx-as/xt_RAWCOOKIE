@@ -14,18 +14,33 @@
 #export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
 # parse kernel version from the changelog
-export CHANGELOG_KERNEL_VERSION := $(shell dpkg-parsechangelog -SVersion |cut -d '~' -f2)-amd64
+export KERNEL_VERSION := $(shell dpkg-parsechangelog -SVersion |cut -d '~' -f2)-amd64
 
 # parse kernel version from meta package
-export KERNEL_VERSION := $(shell apt-cache depends linux-headers-amd64 |tail -n1 |sed -e 's/^.*linux-headers-//')
+export PKG_KERNEL_VERSION := $(shell apt-cache depends linux-headers-amd64 |tail -n1 |sed -e 's/^.*linux-headers-//')
+
+PANDOC := $(shell which pandoc)
 
 %:
-ifeq ($(CHANGELOG_KERNEL_VERSION), $(KERNEL_VERSION))
+ifeq ($(PKG_KERNEL_VERSION), $(KERNEL_VERSION))
+	@echo "[OK] linux-headers-amd64 meta package match found"
+	dh $@
+else ifneq (,$(wildcard /usr/src/linux-headers-$(KERNEL_VERSION)))
+	@echo "[WARN] linux-headers-amd64 meta package mismatch, but source files found"
 	dh $@
 else
-	@echo "[ERROR] Changelog kernel mismatched installed linux-headers-amd64 meta package"
+	@echo "[ERROR] Changelog kernel mismatched installed linux-headers-amd64 meta package and source files not found"
 	@false
 endif
+
+override_dh_installman:
+ifndef PANDOC
+	@echo "[WARN] missing pandoc, unable to regenerate manpage from README.md"
+else
+	$(shell sed -e "1i%RAWCOOKIE(4) $$(dpkg-parsechangelog -SVersion)" README.md | \
+	  pandoc -s -f markdown -t man -o xt-rawcookie.4)
+endif
+	dh_installman
 
 
 # dh_make generated override targets
