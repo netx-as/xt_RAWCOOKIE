@@ -17,13 +17,13 @@
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_seqadj.h>
 #include <net/netfilter/nf_conntrack_synproxy.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
 #include <linux/netfilter/nf_synproxy.h>
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 #include <net/netfilter/nf_synproxy.h>
 #endif
-//
+
 #include "xt_RAWCOOKIE.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
@@ -255,7 +255,7 @@ rawcookie_send_tcp_raw(struct net *net,
 static void
 rawcookie_send_client_synack(struct net *net,
 			    const struct sk_buff *skb, const struct tcphdr *th,
-			    const struct synproxy_options *opts,
+			    struct synproxy_options *opts,
 				const struct xt_rawcookie_info *info)
 {
 	struct sk_buff *nskb;
@@ -264,7 +264,9 @@ rawcookie_send_client_synack(struct net *net,
 	unsigned int tcp_hdr_size;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0)
-	u16 mss = opts->mss_encode;
+	u16 mss;
+	opts->mss_encode = opts->mss_option;
+	mss = opts->mss_encode;
 #else
 	u16 mss = opts->mss;
 #endif
@@ -391,6 +393,13 @@ rawcookie_tg4(struct sk_buff *skb, const struct xt_action_param *par)
 			opts.options &= ~(XT_RAWCOOKIE_OPT_WSCALE |
 					  XT_RAWCOOKIE_OPT_SACK_PERM |
 					  XT_RAWCOOKIE_OPT_ECN);
+
+		if (opts.options & XT_RAWCOOKIE_OPT_MSS)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0)
+			opts.mss_option = info->mss;
+#else
+			opts.mss = info->mss;
+#endif
 
 		rawcookie_send_client_synack(net, skb, th, &opts, info);
 		return NF_DROP;
