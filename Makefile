@@ -23,7 +23,7 @@ clean:
 install:
 
 	install -D -t $(DESTDIR)/$(MODPATH)/kernel/net/netfilter $(MODULE_NAME).ko
-	install -D -t $(DESTDIR)/usr/lib/x86_64-linux-gnu/xtables $(MODULE_LIB).so
+	install -D -t $(DESTDIR)/usr/lib64/xtables $(MODULE_LIB).so
 
 
 tar:
