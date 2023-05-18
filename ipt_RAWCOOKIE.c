@@ -327,7 +327,7 @@ rawcookie_init_timestamp_cookie(const struct xt_rawcookie_info *info,
 {
 	opts->tsecr = opts->tsval;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
-	opts->tsval = tcp_jiffies32 & ~0x3f;
+	opts->tsval = tcp_time_stamp_raw() & ~0x3f;
 #else
 	opts->tsval = tcp_time_stamp & ~0x3f;
 #endif
