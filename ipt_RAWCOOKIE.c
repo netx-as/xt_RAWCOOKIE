@@ -183,10 +183,8 @@ rawcookie_send_tcp(struct net *net,
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,0)
 	ip_local_out(net, nskb->sk, nskb);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
-	ip_local_out(nskb);
 #else
-#error "The module is not supported on this kernel. Use >= 2.6.25"
+	ip_local_out(nskb);
 #endif
 
 	return;
@@ -255,6 +253,7 @@ rawcookie_send_tcp_raw(struct net *net,
 static void
 rawcookie_send_client_synack(struct net *net,
 			    const struct sk_buff *skb, const struct tcphdr *th,
+			    u16 client_mss,
 			    struct synproxy_options *opts,
 				const struct xt_rawcookie_info *info)
 {
@@ -262,14 +261,6 @@ rawcookie_send_client_synack(struct net *net,
 	struct iphdr *iph, *niph;
 	struct tcphdr *nth;
 	unsigned int tcp_hdr_size;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0)
-	u16 mss;
-	opts->mss_encode = opts->mss_option;
-	mss = opts->mss_encode;
-#else
-	u16 mss = opts->mss;
-#endif
 
 	iph = ip_hdr(skb);
 
@@ -286,7 +277,7 @@ rawcookie_send_client_synack(struct net *net,
 	nth = (struct tcphdr *)skb_put(nskb, tcp_hdr_size);
 	nth->source	= th->dest;
 	nth->dest	= th->source;
-	nth->seq	= htonl(__cookie_v4_init_sequence(iph, th, &mss));
+	nth->seq	= htonl(__cookie_v4_init_sequence(iph, th, &client_mss));
 	nth->ack_seq	= htonl(ntohl(th->seq) + 1);
 	tcp_flag_word(nth) = TCP_FLAG_SYN | TCP_FLAG_ACK;
 	if (opts->options & XT_RAWCOOKIE_OPT_ECN)
@@ -313,11 +304,9 @@ rawcookie_send_client_synack(struct net *net,
 		nskb->nfct = &nf_ct_untracked_get()->ct_general;
 		nskb->nfctinfo = IP_CT_NEW;
 		nf_conntrack_get(nskb->nfct);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
+#else
 		/* backported from kernel 4.11 - centos7 */
 		nf_ct_set(nskb, NULL, IP_CT_UNTRACKED);
-#else
-#error "The module is not supported on this kernel. Use >= 3.10"
 #endif
 		rawcookie_send_tcp(net, skb, nskb, NULL,
 			IP_CT_ESTABLISHED_REPLY, niph, nth, tcp_hdr_size);
@@ -331,7 +320,7 @@ rawcookie_init_timestamp_cookie(const struct xt_rawcookie_info *info,
 {
 	opts->tsecr = opts->tsval;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
-	opts->tsval = tcp_jiffies32 & ~0x3f;
+	opts->tsval = tcp_time_stamp_raw() & ~0x3f;
 #else
 	opts->tsval = tcp_time_stamp & ~0x3f;
 #endif
@@ -380,13 +369,33 @@ rawcookie_tg4(struct sk_buff *skb, const struct xt_action_param *par)
 	}
 
 	if (th->syn && !(th->ack || th->fin || th->rst)) {
+		/*
+		 * Work around lack of mss_encode in synproxy_options on older kernels
+		 * by passing it to rawcookie_send_client_synack using separate argument.
+		 */
+		u16 client_mss;
+
 		/* Initial SYN from client */
 		this_cpu_inc(snet->stats->syn_received);
 
 		if (th->ece && th->cwr)
 			opts.options |= XT_RAWCOOKIE_OPT_ECN;
 
+		/*
+		 * Reset client provided TCP option to only those present in filter
+		 * configuration. This will, for example, cause MSS option to be
+		 * left out of SYN/ACK when MSS was not configured when inserting
+		 * the filter.
+		 */
 		opts.options &= info->options;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0)
+		client_mss = opts.mss_option;
+		opts.mss_encode = opts.mss_option;
+		opts.mss_option = info->mss;
+#else
+		client_mss = opts.mss;
+		opts.mss = info->mss;
+#endif
 		if (opts.options & XT_RAWCOOKIE_OPT_TIMESTAMP)
 			rawcookie_init_timestamp_cookie(info, &opts);
 		else
@@ -394,14 +403,7 @@ rawcookie_tg4(struct sk_buff *skb, const struct xt_action_param *par)
 					  XT_RAWCOOKIE_OPT_SACK_PERM |
 					  XT_RAWCOOKIE_OPT_ECN);
 
-		if (opts.options & XT_RAWCOOKIE_OPT_MSS)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0)
-			opts.mss_option = info->mss;
-#else
-			opts.mss = info->mss;
-#endif
-
-		rawcookie_send_client_synack(net, skb, th, &opts, info);
+		rawcookie_send_client_synack(net, skb, th, client_mss, &opts, info);
 		return NF_DROP;
 
 	} else if (th->ack && !(th->fin || th->rst || th->syn)) {
