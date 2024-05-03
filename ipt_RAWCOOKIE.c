@@ -204,7 +204,6 @@ rawcookie_send_tcp_raw(struct net *net,
 {
 
 	struct ethhdr *eth_h;  /* Ethernet header */
-	int ret;
 
 	nth->check = ~tcp_v4_check(tcp_hdr_size, niph->saddr, niph->daddr, 0);
 	nskb->ip_summed   = CHECKSUM_PARTIAL;
@@ -239,14 +238,8 @@ rawcookie_send_tcp_raw(struct net *net,
 
 	eth_h->h_proto = nskb->protocol;
 
-
-	ret = dev_queue_xmit(nskb);
-    if (ret != 0) {
-        pr_debug("xt_rawcookie2: dev_queue_xmit failed. errno=%d.\n", -ret);
-        kfree_skb(nskb);
-    }
-
-	return;
+	/* dev_queue_xmit always consumes the buffer, regardless of the return value. */
+	dev_queue_xmit(nskb);
 }
 
 
