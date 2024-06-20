@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define XTABLES_INTERNAL 1
 #include <xtables.h>
 #include "xt_RAWCOOKIE.h"
 
