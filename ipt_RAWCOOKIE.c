@@ -307,7 +307,7 @@ rawcookie_send_client_synack(struct net *net,
 }
 
 
-void
+static void
 rawcookie_init_timestamp_cookie(const struct xt_rawcookie_info *info,
 				    struct synproxy_options *opts)
 {
