@@ -88,7 +88,7 @@ synproxy_build_options(struct tcphdr *th, const struct synproxy_options *opts)
 }
 #endif
 
-int
+static int
 rawcookie_ip_route_me_harder(struct net *net, struct sk_buff *skb, unsigned int addr_type)
 {
 //    struct net *net = dev_net(skb_dst(skb)->dev);
